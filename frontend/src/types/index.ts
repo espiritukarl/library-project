@@ -13,10 +13,9 @@ export type UserBook = {
   id: string
   userId: string
   bookId: string
-  status: 'WANT_TO_READ' | 'READING' | 'COMPLETED'
+  status: 'WANT_TO_READ' | 'READING' | 'COMPLETED' | 'BOOKMARKED'
   rating?: number | null
   review?: string | null
   currentPage?: number | null
   book: Book
 }
-

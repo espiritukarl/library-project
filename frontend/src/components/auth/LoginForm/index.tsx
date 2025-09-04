@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function LoginForm() {
   const { login } = useAuth()
@@ -9,6 +10,7 @@ export default function LoginForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -18,7 +20,30 @@ export default function LoginForm() {
       const to = (loc.state as any)?.from?.pathname || '/'
       nav(to)
     } catch (err: any) {
-      setError(err?.data?.error || 'Login failed')
+      console.error('Login error:', err)
+      if (err?.data?.error) {
+        // Handle Zod validation errors
+        if (typeof err.data.error === 'object' && err.data.error.formErrors) {
+          const formErrors = err.data.error.formErrors
+          const fieldErrors = err.data.error.fieldErrors
+          let errorMessage = 'Validation failed:'
+          if (formErrors && formErrors.length > 0) {
+            errorMessage += ` ${formErrors.join(', ')}`
+          }
+          if (fieldErrors) {
+            Object.entries(fieldErrors).forEach(([field, errors]) => {
+              if (Array.isArray(errors)) {
+                errorMessage += ` ${field}: ${errors.join(', ')}`
+              }
+            })
+          }
+          setError(errorMessage)
+        } else {
+          setError(typeof err.data.error === 'string' ? err.data.error : 'Login failed')
+        }
+      } else {
+        setError('Login failed')
+      }
     }
   }
 
@@ -33,7 +58,22 @@ export default function LoginForm() {
           </div>
           <div className="space-y-1">
             <label className="text-sm text-slate-600 dark:text-slate-300">Password</label>
-            <input className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <div className="relative">
+              <input 
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm dark:border-slate-700 dark:bg-slate-800" 
+                type={showPassword ? "text" : "password"} 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                required 
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button className="inline-flex rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300" type="submit">Sign in</button>
