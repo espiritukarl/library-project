@@ -1,14 +1,14 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
-import { CssBaseline, ThemeProvider, createTheme } from '@mui/material'
+import { RouterProvider } from 'react-router-dom'
+import { router } from './app-routes'
+import { ThemeProvider } from './contexts/ThemeContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider theme={createTheme({ palette: { mode: 'light' } })}>
-      <CssBaseline />
-      <App />
+    <ThemeProvider>
+      <RouterProvider router={router} />
     </ThemeProvider>
   </StrictMode>,
 )
