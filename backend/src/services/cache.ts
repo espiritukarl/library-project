@@ -17,5 +17,8 @@ export class SimpleCache<T> {
   set(key: string, value: T) {
     this.store.set(key, { value, expires: Date.now() + this.ttlMs });
   }
-}
 
+  delete(key: string) {
+    this.store.delete(key);
+  }
+}
