@@ -9,9 +9,35 @@ async function request(path: string, init?: RequestInit) {
       if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     } catch {}
   }
-  const res = await fetch(base + path, { ...init, headers });
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let res = await fetch(base + path, { ...init, headers });
+  let text = await res.text();
+  let data = text ? JSON.parse(text) : null;
+  if (res.status === 401) {
+    // try refresh once
+    try {
+      const stored = localStorage.getItem('auth');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.refreshToken) {
+          const r = await fetch(base + '/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken: parsed.refreshToken }),
+          });
+          const t = await r.text();
+          const rd = t ? JSON.parse(t) : null;
+          if (r.ok && rd?.accessToken) {
+            const next = { ...parsed, accessToken: rd.accessToken, refreshToken: rd.refreshToken || parsed.refreshToken };
+            localStorage.setItem('auth', JSON.stringify(next));
+            const retryHeaders = { ...headers, Authorization: `Bearer ${rd.accessToken}` };
+            res = await fetch(base + path, { ...init, headers: retryHeaders });
+            text = await res.text();
+            data = text ? JSON.parse(text) : null;
+          }
+        }
+      }
+    } catch {}
+  }
   if (!res.ok) throw Object.assign(new Error(data?.error || 'Request failed'), { status: res.status, data });
   return data;
 }
@@ -22,4 +48,3 @@ export const api = {
   put: (path: string, body?: any) => request(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (path: string) => request(path, { method: 'DELETE' }),
 };
-
