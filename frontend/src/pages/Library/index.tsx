@@ -8,6 +8,7 @@ type Item = { id: string; status: 'WANT_TO_READ'|'READING'|'COMPLETED'; currentP
 export default function Library() {
   const [items, setItems] = useState<Item[]>([])
   const [filter, setFilter] = useState<string>('')
+  const [pending, setPending] = useState<Record<string, boolean>>({})
 
   const load = async () => {
     const qs = filter ? `?status=${encodeURIComponent(filter)}` : ''
@@ -17,12 +18,38 @@ export default function Library() {
   useEffect(() => { load() }, [filter])
 
   const updateStatus = async (id: string, status: Item['status']) => {
-    await api.put(`/user/books/${id}`, { status })
-    load()
+    const prev = items
+    setItems((list) => {
+      const updated = list.map((it) => (it.id === id ? { ...it, status } : it))
+      if (filter) {
+        return updated.filter((it) => (it.id === id ? status === (filter as any) : it.status === (filter as any)))
+      }
+      return updated
+    })
+    try {
+      await api.put(`/user/books/${id}`, { status })
+    } catch (e) {
+      // revert on error
+      setItems(prev)
+      // optional: surface error
+      // eslint-disable-next-line no-console
+      console.error(e)
+    }
   }
   const updateProgress = async (id: string, page: number) => {
-    await api.put(`/user/books/${id}/progress`, { currentPage: page })
-    load()
+    // optimistic update
+    const prev = items
+    setItems((list) => list.map((it) => (it.id === id ? { ...it, currentPage: Math.max(0, page) } : it)))
+    setPending((p) => ({ ...p, [id]: true }))
+    try {
+      await api.put(`/user/books/${id}/progress`, { currentPage: Math.max(0, page) })
+    } catch (e) {
+      setItems(prev)
+      // eslint-disable-next-line no-console
+      console.error(e)
+    } finally {
+      setPending((p) => ({ ...p, [id]: false }))
+    }
   }
 
   return (
@@ -48,9 +75,9 @@ export default function Library() {
                   <option value="COMPLETED">Completed</option>
                 </select>
                 <div className="flex items-center gap-2">
-                  <button className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => updateProgress(it.id, Math.max(0, (it.currentPage || 0) - 1))}><Minus size={14} /></button>
+                  <button disabled={!!pending[it.id]} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => updateProgress(it.id, Math.max(0, (it.currentPage || 0) - 1))}><Minus size={14} /></button>
                   <span className="w-6 text-center text-sm">{it.currentPage || 0}</span>
-                  <button className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => updateProgress(it.id, (it.currentPage || 0) + 1)}><Plus size={14} /></button>
+                  <button disabled={!!pending[it.id]} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => updateProgress(it.id, (it.currentPage || 0) + 1)}><Plus size={14} /></button>
                 </div>
               </div>
             </div>
