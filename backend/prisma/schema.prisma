@@ -23,7 +23,8 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  library UserBook[]
+  library      UserBook[]
+  readingGoals ReadingGoal[]
 }
 
 model Book {
@@ -119,4 +120,19 @@ model ReadingProgress {
   userBook UserBook @relation(fields: [userBookId], references: [id], onDelete: Cascade)
 
   @@index([userBookId, createdAt])
+}
+
+model ReadingGoal {
+  id          String   @id @default(cuid())
+  userId      String
+  year        Int
+  month       Int?
+  targetBooks Int?
+  targetPages Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, year, month])
 }
