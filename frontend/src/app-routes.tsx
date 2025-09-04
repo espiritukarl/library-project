@@ -11,18 +11,22 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 import Analytics from './pages/Analytics';
 
 export const router = createBrowserRouter([
+  { path: '/login', element: <LoginForm /> },
   {
     path: '/',
-    element: <App />,
+    element: (
+      <ProtectedRoute>
+        <App />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <Home /> },
       { path: 'discover', element: <Discover /> },
-      { path: 'library', element: (<ProtectedRoute><Library /></ProtectedRoute>) },
+      { path: 'library', element: <Library /> },
       { path: 'bookmarks', element: <Bookmarks /> },
       { path: 'settings', element: <Settings /> },
       { path: 'help', element: <Help /> },
-      { path: 'login', element: <LoginForm /> },
-      { path: 'analytics', element: (<ProtectedRoute><Analytics /></ProtectedRoute>) },
+      { path: 'analytics', element: <Analytics /> },
     ],
   },
 ]);

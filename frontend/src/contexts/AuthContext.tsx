@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { api } from '../services/api';
 
-export type User = { id: string; email: string; username?: string | null };
+export type User = { id: string; username: string };
 
 type AuthCtx = {
   user: User | null;
@@ -33,13 +33,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     localStorage.setItem('auth', JSON.stringify({ user: u, accessToken: token, refreshToken }));
   };
 
-  const login = async (email: string, password: string) => {
-    const res = await api.post('/auth/login', { email, password });
+  const login = async (username: string, password: string) => {
+    const res = await api.post('/auth/login', { username, password });
     save(res.user, res.accessToken, res.refreshToken);
   };
-  const register = async (email: string, password: string, username?: string) => {
-    const res = await api.post('/auth/register', { email, password, username });
-    save(res.user, res.accessToken, res.refreshToken);
+  const register = async () => {
+    throw new Error('Registration disabled');
   };
   const logout = () => {
     setUser(null);

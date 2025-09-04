@@ -3,12 +3,24 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 
 import { prisma } from '../db/client';
-import { coverUrlFromId, getOpenLibraryWork, searchOpenLibrary } from '../services/openLibrary';
+import { coverUrlFromId, getOpenLibraryWork, searchOpenLibrary, getTrendingSubjects } from '../services/openLibrary';
+import { requireAuth } from '../middleware/auth';
 
 export const booksRouter = Router();
 
 const limiter = rateLimit({ windowMs: 60_000, limit: 60 });
 booksRouter.use(limiter);
+
+// Public endpoints (no auth required)
+// Get trending categories/subjects
+booksRouter.get('/categories', async (req, res) => {
+  try {
+    const categories = await getTrendingSubjects();
+    res.json({ categories });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
 
 booksRouter.get('/search', async (req, res) => {
   const q = String(req.query.q || '').trim();
@@ -24,6 +36,9 @@ booksRouter.get('/search', async (req, res) => {
   }));
   res.json({ results: mapped });
 });
+
+// Protected endpoints (auth required)
+booksRouter.use(requireAuth);
 
 booksRouter.get('/:id', async (req, res) => {
   const book = await prisma.book.findUnique({ where: { id: req.params.id } });
@@ -81,4 +96,3 @@ booksRouter.post('/', async (req, res) => {
   const book = await prisma.book.create({ data: payload as any });
   res.status(201).json({ book, created: true });
 });
-

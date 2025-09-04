@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
@@ -26,32 +27,38 @@ function parseArgs(argv) {
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
+function isValidUsername(username) {
+  return /^[a-zA-Z0-9_\-.]{3,50}$/.test(username);
+}
 
 async function main() {
   const { email, password, username } = parseArgs(process.argv);
-  if (!email || !password) {
-    console.error('Usage: node scripts/create-account.js --email <email> --password <password> [--username <name>]');
+  if (!username || !password) {
+    console.error('Usage: node scripts/create-account.js --username <username> --password <password> [--email <email>]');
     process.exit(1);
   }
-  if (!isValidEmail(email)) {
+  if (email && !isValidEmail(email)) {
     console.error('Invalid email format');
+    process.exit(1);
+  }
+  if (!isValidUsername(username)) {
+    console.error('Invalid username. Use 3-50 chars [a-zA-Z0-9_.-]');
     process.exit(1);
   }
   if (String(password).length < 8) {
     console.error('Password must be at least 8 characters');
     process.exit(1);
   }
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) {
-    console.error(`User with email ${email} already exists (id=${existing.id}).`);
+    console.error(`User with username ${username} already exists (id=${existing.id}).`);
     process.exit(2);
   }
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await prisma.user.create({ data: { email, username: username || null, passwordHash } });
-  console.log('Created user:', { id: user.id, email: user.email, username: user.username });
+  const user = await prisma.user.create({ data: { email: email || null, username, passwordHash } });
+  console.log('Created user:', { id: user.id, username: user.username, email: user.email });
 }
 
 main()
   .catch((e) => { console.error(e); process.exit(1); })
   .finally(async () => { await prisma.$disconnect(); });
-

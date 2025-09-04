@@ -8,7 +8,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
     const payload = verifyAccessToken(token);
-    (req as any).user = { id: payload.sub, email: payload.email };
+    (req as any).user = { id: payload.sub, username: payload.username };
     return next();
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });

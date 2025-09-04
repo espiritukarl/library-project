@@ -114,8 +114,8 @@ export default function App() {
                     <Bell size={18} />
                   </button>
                   <button onClick={() => setMenuOpen((x) => !x)} className="flex items-center gap-2 rounded-full bg-gray-200 p-1 pr-3 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-white">{user.email.slice(0,1).toUpperCase()}</span>
-                    <span className="text-sm">{user.email}</span>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-white">{user.username.slice(0,1).toUpperCase()}</span>
+                    <span className="text-sm">{user.username}</span>
                   </button>
                   {menuOpen && (
                     <div className="absolute right-0 top-10 w-48 rounded-md border border-gray-200 bg-white p-1 text-sm shadow-md dark:border-gray-700 dark:bg-gray-900">

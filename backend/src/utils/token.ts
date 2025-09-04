@@ -7,7 +7,7 @@ const refreshTtl = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
 
 export type JwtPayload = {
   sub: string;
-  email?: string;
+  username?: string;
 };
 
 export function signAccessToken(payload: JwtPayload) {
@@ -25,4 +25,3 @@ export function verifyAccessToken(token: string): JwtPayload {
 export function verifyRefreshToken(token: string): JwtPayload {
   return jwt.verify(token, refreshSecret) as JwtPayload;
 }
-
