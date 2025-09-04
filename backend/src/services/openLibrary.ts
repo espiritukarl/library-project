@@ -22,7 +22,7 @@ export async function searchOpenLibrary(query: string, limit = 20) {
       console.error('OpenLibrary search failed:', res.status, res.statusText);
       return [];
     }
-    const data = await res.json();
+    const data: any = await res.json();
     const mapped = (data.docs || []).map((d: any) => ({
       title: d.title,
       authorNames: d.author_name || [],
@@ -49,10 +49,13 @@ export async function getOpenLibraryWork(olid: string) {
   const url = `https://openlibrary.org/works/${encodeURIComponent(olid)}.json`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4000);
-  const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'PersonalLibrary/1.0 (https://localhost)' } });
+  const res = await fetch(url, {
+    signal: controller.signal,
+    headers: { 'User-Agent': 'PersonalLibrary/1.0 (https://localhost)' },
+  });
   clearTimeout(timer);
   if (!res.ok) throw new Error('OpenLibrary details failed');
-  const data = await res.json();
+  const data: any = await res.json();
   detailsCache.set(key, data);
   return data;
 }
@@ -69,11 +72,14 @@ async function getAuthorName(authorKey: string): Promise<string | undefined> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'PersonalLibrary/1.0 (https://localhost)' } });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'PersonalLibrary/1.0 (https://localhost)' },
+    });
     clearTimeout(timer);
     if (!res.ok) return undefined;
-    const data = await res.json();
-    const name = data?.name as string | undefined;
+    const data: any = await res.json();
+    const name = (data as any)?.name as string | undefined;
     if (name) detailsCache.set(key, name);
     return name;
   } catch {
@@ -89,11 +95,14 @@ async function getWorkEditionPageCount(olid: string): Promise<number | undefined
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'PersonalLibrary/1.0 (https://localhost)' } });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'PersonalLibrary/1.0 (https://localhost)' },
+    });
     clearTimeout(timer);
     if (!res.ok) return undefined;
-    const data = await res.json();
-    const entry = (data?.entries || [])[0];
+    const data: any = await res.json();
+    const entry = ((data as any)?.entries || [])[0];
     const pages = entry?.number_of_pages as number | undefined;
     if (pages) detailsCache.set(key, pages);
     return pages;
@@ -106,11 +115,15 @@ export async function getWorkDetails(olid: string) {
   const work = await getOpenLibraryWork(olid);
   const title = work?.title as string | undefined;
   const desc = typeof work?.description === 'string' ? work.description : work?.description?.value;
-  const firstPublish = (work?.first_publish_date as string | undefined) || (work?.created?.value as string | undefined);
+  const firstPublish =
+    (work?.first_publish_date as string | undefined) ||
+    (work?.created?.value as string | undefined);
   const firstPublishYear = firstPublish ? parseInt(firstPublish.slice(0, 4), 10) : undefined;
   const coverId = Array.isArray(work?.covers) ? work.covers[0] : undefined;
   const coverUrl = coverUrlFromId(coverId);
-  const authorKeys: string[] = Array.isArray(work?.authors) ? work.authors.map((a: any) => a?.author?.key).filter(Boolean) : [];
+  const authorKeys: string[] = Array.isArray(work?.authors)
+    ? work.authors.map((a: any) => a?.author?.key).filter(Boolean)
+    : [];
   const authorNames: string[] = [];
   for (const key of authorKeys.slice(0, 3)) {
     const name = await getAuthorName(key);
@@ -126,7 +139,16 @@ export async function getSubjectSlugs() {
   const key = 'subject_slugs';
   const cached = subjectSlugsCache.get(key);
   if (cached) return cached;
-  const subjects = ['fiction', 'fantasy', 'science fiction', 'romance', 'mystery', 'history', 'biography', 'children'];
+  const subjects = [
+    'fiction',
+    'fantasy',
+    'science fiction',
+    'romance',
+    'mystery',
+    'history',
+    'biography',
+    'children',
+  ];
   subjectSlugsCache.set(key, subjects);
   return subjects;
 }
@@ -159,7 +181,7 @@ export async function getTrendingAuthors(forceRefresh = false) {
     const shuffled = [...cached].sort(() => Math.random() - 0.5);
     const trendingAuthors = shuffled.slice(0, 5).map((name) => ({
       name,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
     }));
     return trendingAuthors;
   }
@@ -173,20 +195,23 @@ export async function getTrendingAuthors(forceRefresh = false) {
     // Add a timeout so the UI isn't blocked indefinitely
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'PersonalLibrary/1.0 (https://localhost)' } });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'PersonalLibrary/1.0 (https://localhost)' },
+    });
     clearTimeout(timer);
     if (!res.ok) {
       console.error('OpenLibrary API failed with status:', res.status, res.statusText);
       throw new Error(`OpenLibrary API failed: ${res.status} ${res.statusText}`);
     }
-    
-    const data = await res.json();
-    console.log('OpenLibrary response received, docs count:', data.docs?.length);
-    
+
+    const data: any = await res.json();
+    console.log('OpenLibrary response received, docs count:', (data as any).docs?.length);
+
     // Extract and count authors
     const authorCounts = new Map<string, number>();
-    
-    (data.docs || []).forEach((book: any) => {
+
+    ((data as any).docs || []).forEach((book: any) => {
       if (book.author_name) {
         book.author_name.forEach((author: string) => {
           if (author && author.trim()) {
@@ -205,12 +230,12 @@ export async function getTrendingAuthors(forceRefresh = false) {
 
     // Cache the raw sorted authors list (without randomization)
     detailsCache.set(key, sortedAuthors);
-    
+
     // Randomize and format for each request
     const shuffled = [...sortedAuthors].sort(() => Math.random() - 0.5);
     const trendingAuthors = shuffled.slice(0, 5).map((name) => ({
       name,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
     }));
 
     return trendingAuthors;
@@ -220,20 +245,28 @@ export async function getTrendingAuthors(forceRefresh = false) {
       console.error('Failed to fetch trending authors:', error);
       console.error('Full error details:', JSON.stringify(error, null, 2));
     }
-    
+
     // Fallback to some well-known authors
     const fallbackAuthorNames = [
-      'Stephen King', 'Agatha Christie', 'J.K. Rowling', 'George Orwell', 'Jane Austen',
-      'William Shakespeare', 'Charles Dickens', 'Ernest Hemingway', 'Mark Twain', 'Harper Lee'
+      'Stephen King',
+      'Agatha Christie',
+      'J.K. Rowling',
+      'George Orwell',
+      'Jane Austen',
+      'William Shakespeare',
+      'Charles Dickens',
+      'Ernest Hemingway',
+      'Mark Twain',
+      'Harper Lee',
     ];
-    
+
     // Randomize fallback authors too
     const shuffledFallback = [...fallbackAuthorNames].sort(() => Math.random() - 0.5);
-    const fallbackAuthors = shuffledFallback.slice(0, 5).map(name => ({
+    const fallbackAuthors = shuffledFallback.slice(0, 5).map((name) => ({
       name,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
     }));
-    
+
     return fallbackAuthors;
   }
 }

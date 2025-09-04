@@ -21,7 +21,10 @@ userRouter.get('/books', async (req, res) => {
   const where: any = { userId };
   const statusValues = Object.values(ReadingStatus) as string[];
   if (status && statusValues.includes(status)) where.status = status as any;
-  if (category) where.book = { categories: { some: { category: { name: { contains: category, mode: 'insensitive' } } } } };
+  if (category)
+    where.book = {
+      categories: { some: { category: { name: { contains: category, mode: 'insensitive' } } } },
+    };
 
   const items = await prisma.userBook.findMany({
     where,
@@ -44,7 +47,9 @@ userRouter.post('/books', async (req, res) => {
   // ensure book exists
   const book = await prisma.book.findUnique({ where: { id: bookId } });
   if (!book) return res.status(404).json({ error: 'Book not found' });
-  const existing = await prisma.userBook.findUnique({ where: { userId_bookId: { userId, bookId } } });
+  const existing = await prisma.userBook.findUnique({
+    where: { userId_bookId: { userId, bookId } },
+  });
   if (existing) return res.json({ item: existing, created: false });
   const data: any = { userId, bookId };
   if (typeof currentPage === 'number') data.currentPage = currentPage;
@@ -95,7 +100,10 @@ userRouter.delete('/books/:id', async (req, res) => {
   res.status(204).send();
 });
 
-const progressSchema = z.object({ currentPage: z.number().int().min(0), note: z.string().optional() });
+const progressSchema = z.object({
+  currentPage: z.number().int().min(0),
+  note: z.string().optional(),
+});
 userRouter.put('/books/:id/progress', async (req, res) => {
   const userId = req.user!.id;
   const id = req.params.id;
@@ -104,7 +112,9 @@ userRouter.put('/books/:id/progress', async (req, res) => {
   const existing = await prisma.userBook.findUnique({ where: { id } });
   if (!existing || existing.userId !== userId) return res.status(404).json({ error: 'Not found' });
   const { currentPage, note } = parse.data;
-  const progress = await prisma.readingProgress.create({ data: { userBookId: id, page: currentPage, note } });
+  const progress = await prisma.readingProgress.create({
+    data: { userBookId: id, page: currentPage, note },
+  });
   const item = await prisma.userBook.update({ where: { id }, data: { currentPage } });
   res.json({ progress, item });
 });
@@ -119,7 +129,10 @@ userRouter.get('/stats', async (req, res) => {
     prisma.userBook.count({ where: { userId, status: 'READING' } }),
     prisma.userBook.count({ where: { userId, status: 'COMPLETED' } }),
     prisma.userBook.count({ where: { userId } }),
-    prisma.userBook.findMany({ where: { userId, status: 'COMPLETED', dateCompleted: { gte: start } }, select: { dateCompleted: true } }),
+    prisma.userBook.findMany({
+      where: { userId, status: 'COMPLETED', dateCompleted: { gte: start } },
+      select: { dateCompleted: true },
+    }),
     prisma.readingProgress.findMany({
       where: { userBook: { userId }, createdAt: { gte: start } },
       select: { userBookId: true, page: true, createdAt: true },
@@ -130,10 +143,17 @@ userRouter.get('/stats', async (req, res) => {
   const months: { label: string; year: number; month: number }[] = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ label: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, year: d.getFullYear(), month: d.getMonth() + 1 });
+    months.push({
+      label: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+    });
   }
 
-  const monthlyCompleted: { label: string; count: number }[] = months.map((m) => ({ label: m.label, count: 0 }));
+  const monthlyCompleted: { label: string; count: number }[] = months.map((m) => ({
+    label: m.label,
+    count: 0,
+  }));
   for (const b of completedBooks) {
     if (!b.dateCompleted) continue;
     const y = b.dateCompleted.getFullYear();
@@ -143,7 +163,10 @@ userRouter.get('/stats', async (req, res) => {
     if (entry) entry.count += 1;
   }
 
-  const monthlyPages: { label: string; pages: number }[] = months.map((m) => ({ label: m.label, pages: 0 }));
+  const monthlyPages: { label: string; pages: number }[] = months.map((m) => ({
+    label: m.label,
+    pages: 0,
+  }));
   for (let i = 0; i < progress.length; i++) {
     const curr = progress[i];
     const prev = i > 0 && progress[i - 1].userBookId === curr.userBookId ? progress[i - 1] : null;
@@ -160,7 +183,12 @@ userRouter.get('/stats', async (req, res) => {
     where: { userBook: { userId } },
     orderBy: { createdAt: 'desc' },
     take: 20,
-    select: { id: true, page: true, createdAt: true, userBook: { select: { id: true, book: { select: { id: true, title: true } } } } },
+    select: {
+      id: true,
+      page: true,
+      createdAt: true,
+      userBook: { select: { id: true, book: { select: { id: true, title: true } } } },
+    },
   });
 
   res.json({
@@ -168,14 +196,23 @@ userRouter.get('/stats', async (req, res) => {
     byStatus: { want, reading, completed },
     monthlyCompleted,
     monthlyPages,
-    recentProgress: recentProgress.map((p) => ({ id: p.id, page: p.page, createdAt: p.createdAt, userBookId: p.userBook.id, book: p.userBook.book })),
+    recentProgress: recentProgress.map((p) => ({
+      id: p.id,
+      page: p.page,
+      createdAt: p.createdAt,
+      userBookId: p.userBook.id,
+      book: p.userBook.book,
+    })),
   });
 });
 
 // Goals CRUD
 userRouter.get('/goals', async (req, res) => {
   const userId = req.user!.id;
-  const goals = await prisma.readingGoal.findMany({ where: { userId }, orderBy: [{ year: 'desc' }, { month: 'desc' }] });
+  const goals = await prisma.readingGoal.findMany({
+    where: { userId },
+    orderBy: [{ year: 'desc' }, { month: 'desc' }],
+  });
   res.json({ goals });
 });
 
@@ -190,11 +227,29 @@ userRouter.post('/goals', async (req, res) => {
   const parse = upsertGoalSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
   const { year, month = null, targetBooks = null, targetPages = null } = parse.data;
-  const goal = await prisma.readingGoal.upsert({
-    where: { userId_year_month: { userId, year, month } },
-    create: { userId, year, month, targetBooks, targetPages },
-    update: { targetBooks, targetPages },
-  });
+  // Prisma's compound unique input for (userId, year, month) does not accept null for month in the where clause.
+  // Handle the null-month case manually.
+  const goal =
+    month === null
+      ? await (async () => {
+          const existing = await prisma.readingGoal.findFirst({
+            where: { userId, year, month: null },
+          });
+          if (existing) {
+            return prisma.readingGoal.update({
+              where: { id: existing.id },
+              data: { targetBooks, targetPages },
+            });
+          }
+          return prisma.readingGoal.create({
+            data: { userId, year, month: null, targetBooks, targetPages },
+          });
+        })()
+      : await prisma.readingGoal.upsert({
+          where: { userId_year_month: { userId, year, month: month as number } },
+          create: { userId, year, month: month as number, targetBooks, targetPages },
+          update: { targetBooks, targetPages },
+        });
   res.status(201).json({ goal });
 });
 

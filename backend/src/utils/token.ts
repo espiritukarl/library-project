@@ -1,9 +1,10 @@
 import jwt from 'jsonwebtoken';
 
-const accessSecret = process.env.ACCESS_TOKEN_SECRET || 'dev_access_secret';
-const refreshSecret = process.env.REFRESH_TOKEN_SECRET || 'dev_refresh_secret';
-const accessTtl = process.env.ACCESS_TOKEN_EXPIRES_IN || '15m';
-const refreshTtl = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+// Align with jsonwebtoken v9 typings
+const accessSecret = (process.env.ACCESS_TOKEN_SECRET || 'dev_access_secret') as jwt.Secret;
+const refreshSecret = (process.env.REFRESH_TOKEN_SECRET || 'dev_refresh_secret') as jwt.Secret;
+const accessTtl = (process.env.ACCESS_TOKEN_EXPIRES_IN || '15m') as jwt.SignOptions['expiresIn'];
+const refreshTtl = (process.env.REFRESH_TOKEN_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'];
 
 export type JwtPayload = {
   sub: string;
