@@ -8,6 +8,7 @@ import { useAuth } from './contexts/AuthContext'
 const nav = [
   { text: 'Home', icon: Home, to: '/' },
   { text: 'Discover', icon: Search, to: '/discover' },
+  { text: 'Library', icon: Library, to: '/library' },
   { text: 'Bookmarks', icon: Bookmark, to: '/bookmarks' },
   { text: 'Analytics', icon: BarChart3, to: '/analytics' },
   { text: 'Settings', icon: Settings, to: '/settings' },
@@ -122,11 +123,7 @@ export default function App() {
                     <span className="text-sm">{user.username}</span>
                   </button>
                   {menuOpen && (
-                    <div className="absolute right-0 top-10 w-48 rounded-md border border-gray-200 bg-white p-1 text-sm shadow-md dark:border-gray-700 dark:bg-gray-900">
-                      <button onClick={() => { navigate('/library'); setMenuOpen(false) }} className="block w-full rounded p-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800">My Library</button>
-                      <button onClick={() => { navigate('/analytics'); setMenuOpen(false) }} className="block w-full rounded p-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800">Analytics</button>
-                      <button onClick={() => { navigate('/settings'); setMenuOpen(false) }} className="block w-full rounded p-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800">Settings</button>
-                      <hr className="my-1 border-gray-200 dark:border-gray-700" />
+                    <div className="absolute right-0 top-10 w-32 rounded-md border border-gray-200 bg-white p-1 text-sm shadow-md dark:border-gray-700 dark:bg-gray-900">
                       <button onClick={() => { logout(); setMenuOpen(false); navigate('/') }} className="block w-full rounded p-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800">Logout</button>
                     </div>
                   )}
