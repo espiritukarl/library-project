@@ -172,10 +172,10 @@ src/
 
 ### 5.1 Reading Analytics
 
-- [ ] Reading statistics dashboard
-- [ ] Progress charts and graphs
-- [ ] Reading goals tracking
-- [ ] Monthly/yearly reading summaries
+- [x] Reading statistics dashboard
+- [x] Progress charts and graphs
+- [x] Reading goals tracking
+- [x] Monthly/yearly reading summaries
 
 ### 5.2 Social Features (Future) - don't implement yet
 
