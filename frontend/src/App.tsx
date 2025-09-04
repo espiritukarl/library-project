@@ -107,9 +107,6 @@ export default function App() {
                   <button onClick={() => navigate('/login')} className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
                     <LogIn size={14} /> Login
                   </button>
-                  <button onClick={() => navigate('/register')} className="inline-flex items-center rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200">
-                    Register
-                  </button>
                 </div>
               ) : (
                 <>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../../contexts/AuthContext'
-import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 export default function LoginForm() {
   const { login } = useAuth()
@@ -35,8 +35,8 @@ export default function LoginForm() {
           <input className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className="inline-flex rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300" type="submit">Sign in</button>
-        <p className="text-sm text-slate-600 dark:text-slate-300">No account? <Link to="/register" className="underline">Register</Link></p>
+          <button className="inline-flex rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300" type="submit">Sign in</button>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Don't have an account? Contact the admin.</p>
       </form>
     </div>
   )
