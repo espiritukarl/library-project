@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 
 import { prisma } from '../db/client';
-import { coverUrlFromId, getOpenLibraryWork, searchOpenLibrary, getTrendingSubjects, getTrendingAuthors } from '../services/openLibrary';
+import { coverUrlFromId, getOpenLibraryWork, searchOpenLibrary, getTrendingSubjects, getTrendingAuthors, getWorkDetails } from '../services/openLibrary';
 import { requireAuth } from '../middleware/auth';
 
 export const booksRouter = Router();
@@ -25,7 +25,8 @@ booksRouter.get('/categories', async (req, res) => {
 // Get trending authors
 booksRouter.get('/trending-authors', async (req, res) => {
   try {
-    const authors = await getTrendingAuthors();
+    const forceRefresh = req.query.refresh === 'true';
+    const authors = await getTrendingAuthors(forceRefresh);
     res.json({ authors });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch trending authors' });
@@ -48,6 +49,18 @@ booksRouter.get('/search', async (req, res) => {
   res.json({ results: mapped });
 });
 
+// Get OpenLibrary work details by OLID (public)
+booksRouter.get('/work/:olid', async (req, res) => {
+  try {
+    const olid = String(req.params.olid);
+    const details = await getWorkDetails(olid);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json({ details });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch work details' });
+  }
+});
+
 // Protected endpoints (auth required)
 booksRouter.use(requireAuth);
 
@@ -55,6 +68,30 @@ booksRouter.get('/:id', async (req, res) => {
   const book = await prisma.book.findUnique({ where: { id: req.params.id } });
   if (!book) return res.status(404).json({ error: 'Not found' });
   res.json({ book });
+});
+
+// Get enriched details for a book by its DB id (auth required)
+booksRouter.get('/:id/details', async (req, res) => {
+  const book = await prisma.book.findUnique({ where: { id: req.params.id } });
+  if (!book) return res.status(404).json({ error: 'Not found' });
+  let details: any = {
+    title: book.title,
+    description: book.description,
+    firstPublishYear: book.publishDate ? book.publishDate.getFullYear() : undefined,
+    coverUrl: book.coverUrl,
+    authors: [],
+    pageCount: book.pageCount ?? undefined,
+  };
+  if (book.openLibraryId) {
+    try {
+      const d = await getWorkDetails(book.openLibraryId);
+      details = { ...details, ...d };
+    } catch {
+      // ignore; fall back to stored details
+    }
+  }
+  res.setHeader('Cache-Control', 'public, max-age=60');
+  res.json({ details });
 });
 
 const addSchema = z.object({
@@ -99,9 +136,14 @@ booksRouter.post('/', async (req, res) => {
     pageCount: data.pageCount ?? null,
   } as const;
 
-  const existing = await prisma.book.findFirst({
-    where: { OR: [{ openLibraryId: payload.openLibraryId }, { isbn: payload.isbn }] },
-  });
+  // Avoid null-equality pitfalls: check unique fields individually
+  const byOlid = payload.openLibraryId
+    ? await prisma.book.findUnique({ where: { openLibraryId: payload.openLibraryId } })
+    : null;
+  const byIsbn = !byOlid && payload.isbn
+    ? await prisma.book.findUnique({ where: { isbn: payload.isbn } })
+    : null;
+  const existing = byOlid || byIsbn;
   if (existing) return res.json({ book: existing, created: false });
 
   const book = await prisma.book.create({ data: payload as any });

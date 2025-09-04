@@ -9,6 +9,9 @@ import { router } from './routes';
 
 export const app = express();
 
+// Disable ETag to prevent 304 responses on dynamic APIs
+app.set('etag', false);
+
 app.use(helmet());
 app.use(cors({ origin: env.corsOrigin }));
 app.use(compression());

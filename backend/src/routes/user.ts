@@ -7,6 +7,11 @@ import { requireAuth } from '../middleware/auth';
 
 export const userRouter = Router();
 userRouter.use(requireAuth);
+// Prevent caching on user-specific endpoints
+userRouter.use((_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 
 userRouter.get('/books', async (req, res) => {
   const userId = req.user!.id;
@@ -14,7 +19,8 @@ userRouter.get('/books', async (req, res) => {
   const category = req.query.category ? String(req.query.category) : undefined;
 
   const where: any = { userId };
-  if (status && Object.keys(ReadingStatus).includes(status)) where.status = status as any;
+  const statusValues = Object.values(ReadingStatus) as string[];
+  if (status && statusValues.includes(status)) where.status = status as any;
   if (category) where.book = { categories: { some: { category: { name: { contains: category, mode: 'insensitive' } } } } };
 
   const items = await prisma.userBook.findMany({
@@ -25,18 +31,29 @@ userRouter.get('/books', async (req, res) => {
   res.json({ items });
 });
 
-const addSchema = z.object({ bookId: z.string().min(1) });
+const addSchema = z.object({
+  bookId: z.string().min(1),
+  status: z.nativeEnum(ReadingStatus).optional(),
+  currentPage: z.number().int().min(0).optional(),
+});
 userRouter.post('/books', async (req, res) => {
   const userId = req.user!.id;
   const parse = addSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
-  const { bookId } = parse.data;
+  const { bookId, status, currentPage } = parse.data;
   // ensure book exists
   const book = await prisma.book.findUnique({ where: { id: bookId } });
   if (!book) return res.status(404).json({ error: 'Book not found' });
   const existing = await prisma.userBook.findUnique({ where: { userId_bookId: { userId, bookId } } });
   if (existing) return res.json({ item: existing, created: false });
-  const item = await prisma.userBook.create({ data: { userId, bookId } });
+  const data: any = { userId, bookId };
+  if (typeof currentPage === 'number') data.currentPage = currentPage;
+  if (status) {
+    data.status = status;
+    if (status === 'READING') data.dateStarted = new Date();
+    if (status === 'COMPLETED') data.dateCompleted = new Date();
+  }
+  const item = await prisma.userBook.create({ data });
   res.status(201).json({ item, created: true });
 });
 
@@ -55,7 +72,17 @@ userRouter.put('/books/:id', async (req, res) => {
   const existing = await prisma.userBook.findUnique({ where: { id } });
   if (!existing || existing.userId !== userId) return res.status(404).json({ error: 'Not found' });
 
-  const item = await prisma.userBook.update({ where: { id }, data: parse.data });
+  const data: any = { ...parse.data };
+  if (parse.data.status && parse.data.status !== existing.status) {
+    if (parse.data.status === 'READING' && !existing.dateStarted) {
+      data.dateStarted = new Date();
+    }
+    if (parse.data.status === 'COMPLETED' && !existing.dateCompleted) {
+      data.dateCompleted = new Date();
+    }
+  }
+
+  const item = await prisma.userBook.update({ where: { id }, data });
   res.json({ item });
 });
 
