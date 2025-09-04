@@ -1,10 +1,18 @@
 import { Router } from 'express';
+// eslint-disable-next-line import/no-named-as-default
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 
 import { prisma } from '../db/client';
-import { coverUrlFromId, getOpenLibraryWork, searchOpenLibrary, getTrendingSubjects, getTrendingAuthors, getWorkDetails } from '../services/openLibrary';
 import { requireAuth } from '../middleware/auth';
+import {
+  coverUrlFromId,
+  getOpenLibraryWork,
+  getTrendingAuthors,
+  getTrendingSubjects,
+  getWorkDetails,
+  searchOpenLibrary,
+} from '../services/openLibrary';
 
 export const booksRouter = Router();
 
@@ -17,7 +25,7 @@ booksRouter.get('/categories', async (req, res) => {
   try {
     const categories = await getTrendingSubjects();
     res.json({ categories });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch categories' });
   }
 });
@@ -28,7 +36,7 @@ booksRouter.get('/trending-authors', async (req, res) => {
     const forceRefresh = req.query.refresh === 'true';
     const authors = await getTrendingAuthors(forceRefresh);
     res.json({ authors });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch trending authors' });
   }
 });
@@ -56,7 +64,7 @@ booksRouter.get('/work/:olid', async (req, res) => {
     const details = await getWorkDetails(olid);
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.json({ details });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch work details' });
   }
 });
@@ -131,7 +139,7 @@ booksRouter.post('/', async (req, res) => {
     title: (enriched.title || data.title || 'Untitled').slice(0, 512),
     isbn: data.isbn || null,
     coverUrl: data.coverUrl || null,
-    description: (enriched.description || data.description) || null,
+    description: enriched.description || data.description || null,
     publishDate: data.publishDate ? new Date(data.publishDate) : null,
     pageCount: data.pageCount ?? null,
   } as const;
@@ -140,9 +148,10 @@ booksRouter.post('/', async (req, res) => {
   const byOlid = payload.openLibraryId
     ? await prisma.book.findUnique({ where: { openLibraryId: payload.openLibraryId } })
     : null;
-  const byIsbn = !byOlid && payload.isbn
-    ? await prisma.book.findUnique({ where: { isbn: payload.isbn } })
-    : null;
+  const byIsbn =
+    !byOlid && payload.isbn
+      ? await prisma.book.findUnique({ where: { isbn: payload.isbn } })
+      : null;
   const existing = byOlid || byIsbn;
   if (existing) return res.json({ book: existing, created: false });
 

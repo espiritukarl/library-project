@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 
 // Align with jsonwebtoken v9 typings
 const accessSecret = (process.env.ACCESS_TOKEN_SECRET || 'dev_access_secret') as jwt.Secret;
