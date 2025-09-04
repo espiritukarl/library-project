@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 
 import { prisma } from '../db/client';
-import { coverUrlFromId, getOpenLibraryWork, searchOpenLibrary, getTrendingSubjects } from '../services/openLibrary';
+import { coverUrlFromId, getOpenLibraryWork, searchOpenLibrary, getTrendingSubjects, getTrendingAuthors } from '../services/openLibrary';
 import { requireAuth } from '../middleware/auth';
 
 export const booksRouter = Router();
@@ -22,6 +22,16 @@ booksRouter.get('/categories', async (req, res) => {
   }
 });
 
+// Get trending authors
+booksRouter.get('/trending-authors', async (req, res) => {
+  try {
+    const authors = await getTrendingAuthors();
+    res.json({ authors });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch trending authors' });
+  }
+});
+
 booksRouter.get('/search', async (req, res) => {
   const q = String(req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'q required' });
@@ -34,6 +44,7 @@ booksRouter.get('/search', async (req, res) => {
     openLibraryId: r.openLibraryId,
     coverUrl: coverUrlFromId(r.coverId),
   }));
+  res.setHeader('Cache-Control', 'public, max-age=60');
   res.json({ results: mapped });
 });
 
