@@ -1,0 +1,27 @@
+{
+  "name": "library-project",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "prepare": "husky install",
+    "lint": "npm run lint -w backend && npm run lint -w frontend",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "husky": "^9.1.5",
+    "lint-staged": "^15.2.7",
+    "prettier": "^3.3.3"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,css,md,json}": [
+      "prettier --write",
+      "bash -lc 'if git ls-files --error-unmatch backend >/dev/null 2>&1; then npm run -w backend lint --silent -- --fix || true; fi'",
+      "bash -lc 'if git ls-files --error-unmatch frontend >/dev/null 2>&1; then npm run -w frontend lint --silent -- --fix || true; fi'"
+    ]
+  }
+}
+
