@@ -12,6 +12,7 @@ export default function Discover() {
   const [results, setResults] = useState<Result[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [owned, setOwned] = useState<Set<string>>(new Set())
 
   // sync URL -> state
   useEffect(() => {
@@ -35,6 +36,26 @@ export default function Discover() {
     const t = setTimeout(run, 400)
     return () => { clearTimeout(t); ctrl.abort() }
   }, [q])
+
+  // Load user's library to pre-mark already-added books
+  useEffect(() => {
+    const loadOwned = async () => {
+      try {
+        const data = await api.get('/user/books')
+        const s = new Set<string>()
+        for (const it of data.items || []) {
+          if (it.book?.openLibraryId) s.add(it.book.openLibraryId)
+        }
+        setOwned(s)
+      } catch {
+        // ignore; user may be logged out on first load
+      }
+    }
+    loadOwned()
+    const handler = () => loadOwned()
+    window.addEventListener('user:books-updated', handler as EventListener)
+    return () => window.removeEventListener('user:books-updated', handler as EventListener)
+  }, [])
 
   return (
     <div>
@@ -98,7 +119,7 @@ export default function Discover() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {results.map((r, idx) => (
-              <BookCard key={idx} result={r} />
+              <BookCard key={idx} result={r} alreadyAdded={!!(r.openLibraryId && owned.has(r.openLibraryId))} />
             ))}
           </div>
         </div>

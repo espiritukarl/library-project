@@ -41,21 +41,60 @@ export default function Home() {
   const [progressLoading, setProgressLoading] = useState(true)
   const [trendingAuthors, setTrendingAuthors] = useState<TrendingAuthor[]>([])
   const [authorsLoading, setAuthorsLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [selStatus, setSelStatus] = useState<'BOOKMARKED' | 'READING' | 'COMPLETED'>('BOOKMARKED')
+  const [page, setPage] = useState<string>('')
+  const [selected, setSelected] = useState<Book | null>(null)
+  const [toast, setToast] = useState('')
+  const [details, setDetails] = useState<{ description?: string; firstPublishYear?: number; pageCount?: number } | null>(null)
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [descExpanded, setDescExpanded] = useState(false)
 
-  const addBook = async (book: Book) => {
+  const sanitizeHtml = (html: string) => {
     try {
-      const created = await api.post('/books', { openLibraryId: book.openLibraryId, title: book.title, isbn: undefined, coverUrl: book.cover })
-      if (user) {
-        await api.post('/user/books', { bookId: created.book.id })
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(html, 'text/html')
+      const allowed = new Set(['P','I','EM','B','STRONG','A','UL','OL','LI','BR'])
+      const walk = (node: Node) => {
+        const el = node as HTMLElement
+        if (el.nodeType === 1) {
+          if (!allowed.has(el.tagName)) {
+            const parent = el.parentNode
+            if (parent) {
+              while (el.firstChild) parent.insertBefore(el.firstChild, el)
+              parent.removeChild(el)
+              return
+            }
+          } else {
+            for (const attr of Array.from(el.attributes)) {
+              if (el.tagName === 'A' && attr.name.toLowerCase() === 'href') continue
+              el.removeAttribute(attr.name)
+            }
+            if (el.tagName === 'A') {
+              const href = el.getAttribute('href') || ''
+              if (/^\s*(javascript:|data:)/i.test(href)) {
+                el.removeAttribute('href')
+              } else {
+                el.setAttribute('target', '_blank')
+                el.setAttribute('rel', 'noopener noreferrer')
+              }
+            }
+          }
+        }
+        for (const child of Array.from(node.childNodes)) walk(child)
       }
-    } catch (err) {
-      console.error('Failed to add book to library', err)
+      for (const child of Array.from(doc.body.childNodes)) walk(child)
+      return doc.body.innerHTML
+    } catch {
+      return ''
     }
   }
 
+  // Add-to-library handled via BookCard on Discover; Home displays grid only
+
   useEffect(() => {
     const fetchBooks = async () => {
-      const activeQuery = categories.find(cat => cat.name === activeCategory)?.query || 'fiction'
+      const activeQuery = categories.find(cat => cat.name === activeCategory)?.query || 'popular'
       
       // Check cache first
       if (bookCache.has(activeCategory)) {
@@ -89,10 +128,8 @@ export default function Home() {
       }
     }
 
-    // Add a small delay to prevent rapid API calls
-    const timer = setTimeout(fetchBooks, 100)
-    return () => clearTimeout(timer)
-  }, [activeCategory, bookCache])
+    fetchBooks()
+  }, [activeCategory, categories])
 
   // Fetch categories from API
   useEffect(() => {
@@ -101,6 +138,8 @@ export default function Home() {
         setCategoriesLoading(true)
         const response = await api.get('/books/categories')
         setCategories(response.categories)
+        // Clear cache so Popular uses the correct query if it was pre-fetched
+        setBookCache(new Map())
         // Set first category as active if no active category is set
         if (response.categories.length > 0 && !activeCategory) {
           setActiveCategory(response.categories[0].name)
@@ -109,7 +148,7 @@ export default function Home() {
         console.error('Failed to fetch categories:', error)
         // Fallback to default categories
         setCategories([
-          { name: 'Popular', query: 'fiction', active: true },
+          { name: 'Popular', query: 'popular', active: true },
           { name: 'Mystery', query: 'mystery', active: false },
           { name: 'Romance', query: 'romance', active: false },
           { name: 'Sci-Fi', query: 'science fiction', active: false },
@@ -123,39 +162,45 @@ export default function Home() {
   }, [])
 
   // Fetch reading progress for authenticated users
-  useEffect(() => {
-    const fetchReadingProgress = async () => {
-      if (!user) {
-        setProgressLoading(false)
-        return
-      }
-
-      try {
-        setProgressLoading(true)
-        const response = await api.get('/user/books?status=READING')
-        
-        const progressData = response.items
-          .filter((item: any) => item.currentPage && item.book.pageCount)
-          .slice(0, 3) // Show top 3 currently reading books
-          .map((item: any) => ({
-            id: item.id,
-            title: item.book.title,
-            page: item.currentPage,
-            totalPages: item.book.pageCount,
-            progress: Math.round((item.currentPage / item.book.pageCount) * 100)
-          }))
-        
-        setReadingProgress(progressData)
-      } catch (error) {
-        console.error('Failed to fetch reading progress:', error)
-        setReadingProgress([])
-      } finally {
-        setProgressLoading(false)
-      }
+  const loadReadingProgress = async () => {
+    if (!user) {
+      setProgressLoading(false)
+      return
     }
+    try {
+      setProgressLoading(true)
+      const response = await api.get('/user/books?status=READING')
+      const progressData = response.items
+        .filter((item: any) => item.currentPage && item.book.pageCount)
+        .slice(0, 3)
+        .map((item: any) => ({
+          id: item.id,
+          title: item.book.title,
+          page: item.currentPage,
+          totalPages: item.book.pageCount,
+          progress: Math.round((item.currentPage / item.book.pageCount) * 100)
+        }))
+      setReadingProgress(progressData)
+    } catch (error) {
+      console.error('Failed to fetch reading progress:', error)
+      setReadingProgress([])
+    } finally {
+      setProgressLoading(false)
+    }
+  }
 
-    fetchReadingProgress()
-  }, [user])
+  useEffect(() => { loadReadingProgress() }, [user])
+
+  // Listen for updates (e.g., when a book is added to READING from Discover)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as any
+      if (!detail || detail.status !== 'READING') return
+      loadReadingProgress()
+    }
+    window.addEventListener('user:books-updated', handler as EventListener)
+    return () => window.removeEventListener('user:books-updated', handler as EventListener)
+  }, [])
 
   // Fetch trending authors
   useEffect(() => {
@@ -180,8 +225,8 @@ export default function Home() {
       }
     }
 
-    // Always refresh trending authors on component mount (page refresh/login)
-    fetchTrendingAuthors(true)
+    // Use cached trending authors; backend already caches results
+    fetchTrendingAuthors(false)
   }, [])
 
   return (
@@ -230,14 +275,26 @@ export default function Home() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 max-w-full">
                 {books.map((book) => (
-                  <div key={book.id} className="group cursor-pointer min-w-0">
-                    <div onClick={() => addBook(book)} className="bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 rounded-lg p-3 mb-2 aspect-[3/4] flex items-center justify-center shadow-sm hover:shadow-md transition-shadow duration-200">
+                  <div key={book.id} className="group cursor-pointer min-w-0" onClick={async () => { 
+                    setSelected(book); setShowForm(true);
+                    setDetails(null);
+                    if (book.openLibraryId) {
+                      try {
+                        setDetailsLoading(true);
+                        const d = await api.get(`/books/work/${encodeURIComponent(book.openLibraryId)}`)
+                        setDetails(d.details || null)
+                      } catch {
+                        setDetails(null)
+                      } finally { setDetailsLoading(false) }
+                    }
+                  }}>
+                    <div className="bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 rounded-lg p-3 mb-2 aspect-[3/4] flex items-center justify-center shadow-sm hover:shadow-md transition-shadow duration-200">
                       {book.cover ? (
                         <img 
                           src={book.cover} 
                           alt={book.title} 
                           loading="lazy"
-                          className="w-full h-full object-cover rounded shadow-sm transition-opacity duration-300"
+                          className="w-full h-full object-contain rounded shadow-sm transition-opacity duration-300"
                           style={{ backgroundColor: '#f3f4f6' }}
                           onLoad={(e) => {
                             const target = e.target as HTMLImageElement;
@@ -347,6 +404,85 @@ export default function Home() {
           </div>
         </aside>
       </div>
+      {showForm && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowForm(false)} />
+          <div className="relative z-10 w-[40rem] max-w-[95vw] rounded-md border border-gray-200 bg-white p-6 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-6">
+              <div className="w-28 h-40 flex-shrink-0 bg-gray-200 dark:bg-gray-800 rounded overflow-hidden">
+                {selected.cover ? (
+                  <img src={selected.cover} alt={selected.title} className="w-full h-full object-contain" />
+                ) : null}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold mb-1">{selected.title}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">{Array.isArray(selected.author) ? selected.author.join(', ') : selected.author}{details?.firstPublishYear ? ` • ${details.firstPublishYear}` : ''}{typeof details?.pageCount === 'number' ? ` • ${details.pageCount} pages` : ''}</p>
+                {detailsLoading ? (
+                  <div className="skeleton-shimmer h-16 rounded" />
+                ) : details?.description ? (
+                  <>
+                    <div
+                      className={descExpanded ? 'text-sm text-gray-800 dark:text-gray-200 max-h-40 overflow-auto pr-1' : 'text-sm text-gray-800 dark:text-gray-200 line-clamp-6'}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(details.description) }}
+                    />
+                    <button className="mt-1 text-xs text-blue-600 hover:underline" onClick={() => setDescExpanded((x) => !x)}>
+                      {descExpanded ? 'Show less' : 'Read more'}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">No description available.</p>
+                )}
+              </div>
+            </div>
+            <h3 className="mt-6 mb-2 text-base font-medium">Add to Library</h3>
+            <div className="mb-2">
+              <label className="mb-1 block text-xs text-gray-500">Status</label>
+              <select value={selStatus} onChange={(e) => setSelStatus(e.target.value as any)} className="w-full rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-800">
+                <option value="COMPLETED">Completed</option>
+                <option value="READING">Reading</option>
+                <option value="BOOKMARKED">Bookmarked</option>
+              </select>
+            </div>
+            <div className="mb-3">
+              <label className="mb-1 block text-xs text-gray-500">Current Page</label>
+              <div className="flex items-center gap-2">
+                <input type="number" min={0} max={typeof details?.pageCount === 'number' ? details.pageCount : undefined} value={page} onChange={(e) => setPage(e.target.value)} className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-800" />
+                {typeof details?.pageCount === 'number' && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{(page !== '' ? Math.max(0, Number(page)) : 0)}/{details.pageCount}</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={(e) => { e.stopPropagation(); setShowForm(false) }} className="rounded border border-gray-200 px-2 py-1 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Cancel</button>
+              <button onClick={async () => {
+                try {
+                  const created = await api.post('/books', { openLibraryId: selected.openLibraryId, title: selected.title, coverUrl: selected.cover })
+                  const body: any = { bookId: created.book.id, status: selStatus }
+                  if (page !== '' && !isNaN(Number(page))) body.currentPage = Number(page)
+                  await api.post('/user/books', body)
+                  if (selStatus === 'READING') {
+                    window.dispatchEvent(new CustomEvent('user:books-updated', { detail: { reason: 'added', status: selStatus } }))
+                  }
+                  const toastMessage = selStatus === 'BOOKMARKED' ? `Bookmarked ${selected.title}` : `${selected.title} added to library`
+                  setToast(toastMessage)
+                  setTimeout(() => setToast(''), 2500)
+                } catch (e) {
+                  console.error(e)
+                } finally {
+                  setShowForm(false); setSelected(null); setPage(''); setSelStatus('BOOKMARKED')
+                }
+              }} className="rounded bg-gray-900 px-3 py-1 text-white hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200">Add</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className="rounded-md bg-gray-900 text-white px-3 py-2 text-sm shadow-lg dark:bg-white dark:text-gray-900">
+            {toast}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
