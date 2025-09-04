@@ -1,6 +1,7 @@
 const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+const DEFAULT_TIMEOUT_MS = 5000;
 
-async function request(path: string, init?: RequestInit) {
+async function request(path: string, init?: RequestInit & { timeoutMs?: number }) {
   const authRaw = localStorage.getItem('auth');
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init?.headers as any) };
   if (authRaw) {
@@ -9,7 +10,14 @@ async function request(path: string, init?: RequestInit) {
       if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     } catch {}
   }
-  let res = await fetch(base + path, { ...init, headers });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), init?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(base + path, { ...init, headers, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
   let text = await res.text();
   let data = text ? JSON.parse(text) : null;
   if (res.status === 401) {
@@ -29,14 +37,35 @@ async function request(path: string, init?: RequestInit) {
           if (r.ok && rd?.accessToken) {
             const next = { ...parsed, accessToken: rd.accessToken, refreshToken: rd.refreshToken || parsed.refreshToken };
             localStorage.setItem('auth', JSON.stringify(next));
+            // Trigger a storage event so AuthContext can update
+            window.dispatchEvent(new StorageEvent('storage', {
+              key: 'auth',
+              newValue: JSON.stringify(next),
+              storageArea: localStorage
+            }));
             const retryHeaders = { ...headers, Authorization: `Bearer ${rd.accessToken}` };
-            res = await fetch(base + path, { ...init, headers: retryHeaders });
+            const retryController = new AbortController();
+            const retryTimeout = setTimeout(() => retryController.abort(), init?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+            try {
+              res = await fetch(base + path, { ...init, headers: retryHeaders, signal: retryController.signal });
+            } finally {
+              clearTimeout(retryTimeout);
+            }
             text = await res.text();
             data = text ? JSON.parse(text) : null;
+          } else {
+            // Refresh failed, clear auth data
+            localStorage.removeItem('auth');
           }
+        } else {
+          // No refresh token, clear auth data
+          localStorage.removeItem('auth');
         }
       }
-    } catch {}
+    } catch {
+      // Refresh attempt failed, clear auth data
+      localStorage.removeItem('auth');
+    }
   }
   if (!res.ok) throw Object.assign(new Error(data?.error || 'Request failed'), { status: res.status, data });
   return data;
