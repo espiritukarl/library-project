@@ -13,6 +13,7 @@ enum ReadingStatus {
   WANT_TO_READ
   READING
   COMPLETED
+  BOOKMARKED
 }
 
 model User {
@@ -93,7 +94,7 @@ model UserBook {
   id            String        @id @default(cuid())
   userId        String
   bookId        String
-  status        ReadingStatus @default(WANT_TO_READ)
+  status        ReadingStatus @default(BOOKMARKED)
   rating        Int?
   review        String?
   dateAdded     DateTime      @default(now())
