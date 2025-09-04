@@ -2,14 +2,22 @@ import { useEffect, useState } from 'react'
 import { api } from '../../services/api'
 import BookCard from '../../components/books/BookCard'
 import { Search, Filter } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 
 type Result = { title: string; authors: string[]; firstPublishYear?: number; isbn?: string; openLibraryId?: string; coverUrl?: string }
 
 export default function Discover() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Result[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // sync URL -> state
+  useEffect(() => {
+    const qp = searchParams.get('q') || ''
+    setQ(qp)
+  }, [searchParams])
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -37,7 +45,7 @@ export default function Discover() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input 
               value={q} 
-              onChange={(e) => setQ(e.target.value)} 
+              onChange={(e) => { const v = e.target.value; setQ(v); setSearchParams(v ? { q: v } : {}) }} 
               placeholder="Search for books, authors, or genres..." 
               className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm"
             />
