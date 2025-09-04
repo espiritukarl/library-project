@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Phase 2: Database Schema Design
+
+enum ReadingStatus {
+  WANT_TO_READ
+  READING
+  COMPLETED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  library UserBook[]
+}
+
+model Book {
+  id            String    @id @default(cuid())
+  openLibraryId String?   @unique
+  title         String
+  isbn          String?   @unique
+  coverUrl      String?
+  description   String?
+  publishDate   DateTime?
+  pageCount     Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  authors    BookAuthor[]
+  categories BookCategory[]
+  userBooks  UserBook[]
+
+  @@index([openLibraryId])
+  @@index([isbn])
+}
+
+model Author {
+  id        String   @id @default(cuid())
+  name      String
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  books BookAuthor[]
+
+  @@index([name])
+}
+
+model BookAuthor {
+  bookId   String
+  authorId String
+
+  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  author Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, authorId])
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+
+  books BookCategory[]
+}
+
+model BookCategory {
+  bookId     String
+  categoryId String
+
+  book     Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, categoryId])
+}
+
+model UserBook {
+  id            String        @id @default(cuid())
+  userId        String
+  bookId        String
+  status        ReadingStatus @default(WANT_TO_READ)
+  rating        Int?
+  review        String?
+  dateAdded     DateTime      @default(now())
+  dateStarted   DateTime?
+  dateCompleted DateTime?
+  currentPage   Int?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book     Book              @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  progress ReadingProgress[]
+
+  @@unique([userId, bookId])
+  @@index([status])
+}
+
+model ReadingProgress {
+  id         String   @id @default(cuid())
+  userBookId String
+  page       Int      @default(0)
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  userBook UserBook @relation(fields: [userBookId], references: [id], onDelete: Cascade)
+
+  @@index([userBookId, createdAt])
+}
